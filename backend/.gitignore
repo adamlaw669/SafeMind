@@ -1,0 +1,75 @@
+# Python cruft
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyi
+
+# Virtual envs
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+.env.*.local
+*.env
+
+# IDE trash
+.vscode/
+.idea/
+*.swp
+
+# Compiled stuff
+build/
+dist/
+*.egg-info/
+
+# Bytecode cache
+*.cache
+
+# Logs
+logs/
+*.log
+
+# Alembic
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+
+# Databases
+*.sqlite3
+*.db
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+
+# Docker junk
+docker-compose.override.yml
+docker-data/
+
+# Node stuff if frontend creeps in
+node_modules/
+npm-debug.log
+
+# MacOS stupidity
+.DS_Store
+
+# Pytest cache
+.pytest_cache/
+
+# Redis or message queue dumps
+dump.rdb
+
+# Uploaded files
+uploads/
+media/
+
+# Backup files
+*.bak
+*.tmp
+
+# gitignore 
+*.gitignore
+.gitignore
