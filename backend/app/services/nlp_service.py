@@ -1,11 +1,23 @@
 from app.core.nlp_model import analyze_risk_level
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 class NLPService:
     """
     Service layer for NLP operations.
     Wraps the core logic to make it easily mockable or replaceable later.
     """
+
+    # Define keywords here so startup.py can access them for logging/preloading
+    HIGH_RISK_KEYWORDS: List[str] = [
+        "danger", "help", "emergency", "bleeding", "unconscious",
+        "fire", "accident", "violence", "weapon", "injured",
+        "suicide", "kill", "attack"
+    ]
+
+    MEDIUM_RISK_KEYWORDS: List[str] = [
+        "worried", "concern", "unsafe", "scared",
+        "threat", "fear", "problem"
+    ]
     
     @staticmethod
     async def analyze_report(text: str) -> Dict[str, Any]:

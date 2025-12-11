@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     
     # Redis
     REDIS_URL:  Optional[str] = None
+    CELERY_TASK_ALWAYS_EAGER: bool = False
+    CELERY_BROKER_URL: str | None = None
     
     # RabbitMQ
     RABBITMQ_URL: Optional[str] = None
