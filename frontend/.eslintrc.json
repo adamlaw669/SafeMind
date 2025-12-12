@@ -1,7 +1,0 @@
-{
-  "extends": ["react-app", "react-app/jest"],
-  "rules": {
-    "no-unused-vars": "warn",
-    "react/prop-types": "off"
-  }
-}
