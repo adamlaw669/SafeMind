@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
+from contextlib import asynccontextmanager
 from app.routers import (
     auth_router,
     report_router,
@@ -10,7 +11,7 @@ from app.routers import (
     agency_router,
     followup_router
 )
-from app.events import startup
+from app.db.base import Base, engine
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,13 +19,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app):
+    # Startup
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Shutdown
+    pass
+
 app = FastAPI(
-    title="SafeMind",
+    title="SafeMind API",
     version="1.0.0",
     description="Mental health emergency response platform",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
+    lifespan=lifespan
 )
 
 app.add_middleware(
@@ -34,30 +44,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.on_event("startup")
-async def on_startup():
-    """Initialize application on startup."""
-    try:
-        logger.info("SafeMind backend starting up...")
-        await startup.initialize_database()
-        await startup.initialize_message_queue()
-        await startup.initialize_connection_manager()
-        await startup.preload_nlp_model()
-        logger.info("Application startup completed successfully")
-    except Exception as e:
-        logger.error(f"Startup failed: {str(e)}")
-        raise
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    """Cleanup on application shutdown."""
-    try:
-        logger.info("SafeMind backend shutting down...")
-        await startup.shutdown_database()
-        logger.info("Application shutdown completed")
-    except Exception as e:
-        logger.error(f"Shutdown error: {str(e)}")
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(report_router.router, prefix="/api/reports", tags=["reports"])

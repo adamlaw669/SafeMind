@@ -1,41 +1,93 @@
 from typing import Any, Dict
-
 import requests
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token as google_id_token
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.core.config import settings
-from app.core.security import create_access_token
-from app.db import get_db
+from app.core.security import create_access_token, get_password_hash, hash_password, verify_password
+from app.db.base import get_db
 from app.models.user import User
-from app.schemas.user_schema import UserOut, TokenResponse
+from app.schemas.user_schema import UserCreate, UserOut, TokenResponse, UserResponse, UserLogin
+
+# Standard Auth Router
+# Note: We remove the 'prefix' here because main.py sets it to /api/auth
+router = APIRouter()
+
+# --- STANDARD EMAIL/PASSWORD AUTH ---
+
+@router.post("/signup", response_model=UserResponse)
+def signup(user_data: UserCreate, db: Session = Depends(get_db)):
+    """Register a new user."""
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    new_user = User(
+        email=user_data.email,
+        name=user_data.name,
+        hashed_password=hash_password(user_data.password),
+        is_active=True,
+        is_verified=False,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    access_token = create_access_token(data={"sub": str(new_user.id)})
+    return {
+        "id": new_user.id,
+        "email": new_user.email,
+        "name": new_user.name,
+        "picture": new_user.picture,
+        "is_verified": new_user.is_verified,
+        "is_active": new_user.is_active,
+        "created_at": new_user.created_at,
+        "updated_at": new_user.updated_at,
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
+@router.post("/logout")
+def logout():
+    """
+    Logout (Invalidate token on client side).
+    """
+    return {"message": "Logged out successfully"}
+
+@router.post("/verify-email")
+def verify_email(email: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    user.is_active = True
+    db.commit()
+    return {"message": "Email verified successfully"}
+
+# --- GOOGLE AUTH ---
 
 AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 SCOPES = ["openid", "email", "profile"]
 
-router = APIRouter(prefix="/api/auth/google", tags=["auth"])
-
-
 class GoogleCredentialPayload(BaseModel):
     token: str
 
-
-def _ensure_client_configured() -> None:
-    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_REDIRECT_URI:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Google OAuth client configuration is incomplete.",
-        )
-
-
-def _build_authorization_url() -> str:
+@router.get("/google/login", response_class=RedirectResponse)
+async def google_login():
     from urllib.parse import urlencode
-
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -46,8 +98,9 @@ def _build_authorization_url() -> str:
     }
     return f"{AUTHORIZATION_ENDPOINT}?{urlencode(params)}"
 
-
-def _exchange_code_for_tokens(code: str) -> Dict[str, Any]:
+@router.get("/google/callback", response_model=TokenResponse)
+async def google_callback(code: str, db: Session = Depends(get_db)):
+    # Exchange code for token
     payload = {
         "code": code,
         "client_id": settings.GOOGLE_CLIENT_ID,
@@ -56,109 +109,43 @@ def _exchange_code_for_tokens(code: str) -> Dict[str, Any]:
         "grant_type": "authorization_code",
     }
     try:
-        response = requests.post(TOKEN_ENDPOINT, data=payload, timeout=10)
-        response.raise_for_status()
-    except requests.RequestException as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to exchange authorization code: {exc}",
-        ) from exc
+        res = requests.post(TOKEN_ENDPOINT, data=payload)
+        res.raise_for_status()
+        tokens = res.json()
+    except Exception as e:
+         raise HTTPException(status_code=400, detail=f"Google Auth Error: {str(e)}")
 
-    tokens = response.json()
-    if "id_token" not in tokens:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google token exchange did not return an id_token.",
-        )
-    return tokens
-
-
-def _verify_id_token(id_token: str) -> Dict[str, Any]:
-    if not id_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing Google ID token.",
-        )
-
-    if not settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Google client configuration is missing.",
-        )
-
+    # Verify ID token
     try:
-        return google_id_token.verify_oauth2_token(
-            id_token,
-            GoogleRequest(),
+        id_info = google_id_token.verify_oauth2_token(
+            tokens["id_token"], 
+            GoogleRequest(), 
             settings.GOOGLE_CLIENT_ID,
-            clock_skew_in_seconds=10,
+            clock_skew_in_seconds=10
         )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid Google ID token: {exc}",
-        ) from exc
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google Token")
 
-
-def _upsert_user(db: Session, payload: Dict[str, Any]) -> User:
-    email = payload.get("email")
-    google_sub = payload.get("sub")
-    if not email or not google_sub:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google profile is missing required identifiers.",
-        )
-
+    # Upsert User
+    email = id_info["email"]
     user = db.query(User).filter(User.email == email).first()
-    if user is None:
+    if not user:
         user = User(
             email=email,
-            name=payload.get("name"),
-            picture=payload.get("picture"),
-            google_id=google_sub,
+            name=id_info.get("name"),
+            picture=id_info.get("picture"),
+            google_id=id_info["sub"],
             is_verified=True,
+            is_active=True
         )
         db.add(user)
-    else:
-        user.name = payload.get("name") or user.name
-        user.picture = payload.get("picture") or user.picture
-        if not user.google_id:
-            user.google_id = google_sub
-        user.is_verified = True
+        db.commit()
+        db.refresh(user)
 
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-def _build_token_response(user: User) -> TokenResponse:
+    # Generate JWT
     access_token = create_access_token({"sub": user.email})
-    user_schema = UserOut.model_validate(user)
-    return TokenResponse(
-        access_token=access_token,
-        user=user_schema,
-    )
-
-
-@router.get("/login", status_code=status.HTTP_307_TEMPORARY_REDIRECT, response_class=RedirectResponse)
-async def google_login() -> RedirectResponse:
-    _ensure_client_configured()
-    return RedirectResponse(url=_build_authorization_url())
-
-
-@router.get("/callback", response_model=TokenResponse)
-async def google_callback(code: str, db: Session = Depends(get_db)) -> TokenResponse:
-    _ensure_client_configured()
-    tokens = _exchange_code_for_tokens(code)
-    id_info = _verify_id_token(tokens.get("id_token"))
-    user = _upsert_user(db, id_info)
-    return _build_token_response(user)
-
-
-@router.post("/verify", response_model=TokenResponse)
-async def verify_google_token(
-    payload: GoogleCredentialPayload, db: Session = Depends(get_db)
-) -> TokenResponse:
-    id_info = _verify_id_token(payload.token)
-    user = _upsert_user(db, id_info)
-    return _build_token_response(user)
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "user": user
+    }

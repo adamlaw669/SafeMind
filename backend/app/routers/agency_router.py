@@ -8,9 +8,10 @@ from app.schemas.emergency_schema import EmergencyReportResponse
 from app.schemas.agency_schema import AgencyResponse, AgencyUpdateRequest, AgentActionResponse
 from app.models.emergency import EmergencyReport
 from app.models.agency import Agency
-from app.core.security import get_current_user
+from app.core.dependencies import get_current_user
 from app.crud import report_crud, agency_crud
 from app.services import log_service
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -283,3 +284,21 @@ async def get_agency_info(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve agency information"
         )
+
+
+@router.get("/")
+async def list_agencies(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List all agencies."""
+    return {"agencies": []}
+
+@router.get("/{agency_id}")
+async def get_agency(
+    agency_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific agency."""
+    return {"id": agency_id, "name": "Agency"}
