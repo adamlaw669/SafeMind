@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+    /* SafeMind Brand Colors (Teal/Mint) */
+    --color-brand-50: #f0fdfa;
+    --color-brand-100: #ccfbf1;
+    --color-brand-200: #99f6e4;
+    --color-brand-500: #14b8a6;
+    --color-brand-600: #0d9488;
+    --color-brand-700: #0f766e;
+    --color-brand-900: #134e4a;
+
+    /* Emergency SOS Colors (Red) */
+    --color-emergency-500: #ef4444;
+    --color-emergency-600: #dc2626;
+
+    /* Fonts */
+    --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+    
+    /* Animations */
+    --animate-pulse-fast: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Base Reset */
+body {
+    background-color: var(--color-brand-50);
+    color: #1e293b; /* Slate-800 */
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+}
