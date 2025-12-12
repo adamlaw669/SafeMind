@@ -7,6 +7,7 @@ import ActionButton from '../../../../component/FormButtons/ActionButton';
 import { FaArrowRight } from "react-icons/fa6";
 import { useState } from 'react';
 import FinalConfirmationModal from './FinalConfirmationModal';
+import ReportSentSuccessModal from './ReportSentSuccessModal';
 
 
 type ReportFormInputsType = {
@@ -17,6 +18,7 @@ type ReportFormInputsType = {
 
 const ReportModal = () => {
     const [openConfirmModal, setOpenConfirmModal] = useState<boolean>(false)
+    const [openSuccessModal, setOpenSuccessModal] = useState(false);
     const [formData, setFormData] = useState<reportFormValidationSchemaType | null>(null)
 
     const categoryOptions = [
@@ -61,7 +63,22 @@ const ReportModal = () => {
 
     return (
         <main className="mt-12">
-            {openConfirmModal && <FinalConfirmationModal formData={formData}/>}
+            {openConfirmModal && <FinalConfirmationModal
+                formData={formData}
+                openModal={openConfirmModal}
+                onClose={() => setOpenConfirmModal(false)}
+                onSuccess={() => {
+                    setOpenSuccessModal(true)
+                    
+                }}
+            />}
+
+            {openSuccessModal && (
+                <ReportSentSuccessModal
+                    openModal={openSuccessModal}
+                    onClose={() => setOpenSuccessModal(false)}
+                />
+            )}
             <div className="bgImgForReportModal w-[700px] h-[150px] rounded-lg">
                 <div className="flex flex-col items-center justify-center space-y-1 h-full">
                     <h1 className="text-[32px] font-semibold">Report Case</h1>
