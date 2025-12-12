@@ -7,10 +7,12 @@ type ModalComponentProps = {
     footer: ReactNode;
     open: boolean;
     onClose: ()=>void;
-    title?: string
+    title?: string;
+    width?: string;
+    maskClosable?: boolean
 }
 
-const ModalComponent = ({ children, footer, open, onClose, title }: ModalComponentProps) => {
+const ModalComponent = ({ children, footer, open, onClose, title, width, maskClosable }: ModalComponentProps) => {
     
     return (
         <>
@@ -21,7 +23,8 @@ const ModalComponent = ({ children, footer, open, onClose, title }: ModalCompone
                 onOk={onClose}
                 onCancel={onClose}
                 footer={footer || []}
-                width="765px"
+                width={width}
+                maskClosable={maskClosable}
             >
                 {children}
             </Modal>
