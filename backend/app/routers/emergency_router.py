@@ -8,6 +8,7 @@ from app.schemas.user_schema import UserOut
 from app.core.security import get_current_user
 from app.crud import report_crud
 from app.services.emergency_service import process_emergency_report
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -143,3 +144,65 @@ async def get_user_emergency_reports(
     logger.info(f"Retrieved {len(reports)} emergency reports for user {user_id}")
     
     return [EmergencyReportResponse.model_validate(report) for report in reports]
+
+
+@router.post("/alert")
+async def create_emergency_alert(
+    text: str,
+    location: str = None,
+    current_user: UserOut = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create an emergency alert."""
+    if not text or not text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Alert text cannot be empty"
+        )
+    
+    from app.models.emergency import Emergency
+    
+    emergency = Emergency(
+        user_id=current_user.id,
+        text=text,
+        location=location,
+        is_resolved=False,
+        created_at=datetime.utcnow()
+    )
+    db.add(emergency)
+    db.commit()
+    db.refresh(emergency)
+    
+    return {
+        "id": emergency.id,
+        "user_id": emergency.user_id,
+        "text": emergency.text,
+        "location": emergency.location,
+        "is_resolved": emergency.is_resolved,
+        "created_at": emergency.created_at
+    }
+
+@router.get("/{alert_id}")
+async def get_emergency_alert(
+    alert_id: int,
+    current_user: UserOut = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get an emergency alert."""
+    from app.models.emergency import Emergency
+    
+    alert = db.query(Emergency).filter(Emergency.id == alert_id).first()
+    if not alert:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Alert not found"
+        )
+    
+    return {
+        "id": alert.id,
+        "user_id": alert.user_id,
+        "text": alert.text,
+        "location": alert.location,
+        "is_resolved": alert.is_resolved,
+        "created_at": alert.created_at
+    }

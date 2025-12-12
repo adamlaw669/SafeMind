@@ -29,7 +29,7 @@ def test_user():
     user = User(
         email="reporter@example.com",
         name="Reporter",
-        password_hash=hash_password("password123"),
+        hashed_password=hash_password("password123"),
         is_verified=True,
         is_active=True
     )

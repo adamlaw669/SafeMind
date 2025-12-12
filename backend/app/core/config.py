@@ -12,7 +12,8 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite:///./safemind.db"
-    
+    SQLALCHEMY_DATABASE_URI: str = "sqlite:///./safemind.db" 
+    SQLALCHEMY_ECHO: bool = False
     # Redis
     REDIS_URL:  Optional[str] = None
     CELERY_TASK_ALWAYS_EAGER: bool = False
@@ -36,5 +37,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
+
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
 settings = Settings()

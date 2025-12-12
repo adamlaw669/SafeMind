@@ -8,8 +8,12 @@ class UserBase(BaseModel):
     picture: Optional[str] = None
 
 class UserCreate(UserBase):
-    password: Optional[str] = Field(None, min_length=6)
+    password: str = Field(..., min_length=6)
     google_id: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
 
 class UserUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
@@ -24,6 +28,10 @@ class UserOut(UserBase):
     
     class Config:
         from_attributes = True
+
+class UserResponse(UserOut):
+    access_token: str
+    token_type: str = "bearer"
 
 class UserListResponse(BaseModel):
     id: int

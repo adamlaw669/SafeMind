@@ -7,7 +7,7 @@ from app.schemas.user_schema import UserOut
 from app.schemas.followup_schema import FollowupRequest, FollowupResponse, FollowupCheckinRequest
 from app.models.followup import FollowUp
 from app.models.emergency import EmergencyReport
-from app.core.security import get_current_user
+from app.core.dependencies import get_current_user
 from app.crud import followup_crud, report_crud
 from app.services import followup_service
 
